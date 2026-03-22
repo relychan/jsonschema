@@ -1,9 +1,10 @@
 package jsonschema_test
 
 import (
+	"errors"
 	"testing"
 
-	"github.com/invopop/jsonschema"
+	"github.com/relychan/jsonschema"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -46,8 +47,10 @@ func TestIDValidation(t *testing.T) {
 	}
 
 	id = "foor://invopop.com/schema/user"
-	if assert.Error(t, id.Validate()) {
-		assert.Contains(t, id.Validate().Error(), "schema")
+
+	err := id.Validate()
+	if err == nil || !errors.Is(err, jsonschema.ErrIDInvalidHTTPScheme) {
+		t.Errorf("expected error: %s, got: %s", jsonschema.ErrIDInvalidHTTPScheme, err)
 	}
 
 	id = "invopop.com\n/test"

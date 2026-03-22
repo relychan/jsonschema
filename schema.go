@@ -3,14 +3,14 @@ package jsonschema
 import (
 	"encoding/json"
 
-	orderedmap "github.com/wk8/go-ordered-map/v2"
+	orderedmap "github.com/pb33f/ordered-map/v2"
 )
 
 // Version is the JSON Schema version.
 var Version = "https://json-schema.org/draft/2020-12/schema"
 
 // Schema represents a JSON Schema object type.
-// RFC draft-bhutton-json-schema-00 section 4.3
+// RFC draft-bhutton-json-schema-00 section 4.3.
 type Schema struct {
 	// RFC draft-bhutton-json-schema-00
 	Version     string      `json:"$schema,omitempty"`     // section 8.1.1
@@ -82,13 +82,13 @@ type Schema struct {
 }
 
 var (
-	// TrueSchema defines a schema with a true value
+	// TrueSchema defines a schema with a true value.
 	TrueSchema = &Schema{boolean: &[]bool{true}[0]}
-	// FalseSchema defines a schema with a false value
+	// FalseSchema defines a schema with a false value.
 	FalseSchema = &Schema{boolean: &[]bool{false}[0]}
 )
 
 // Definitions hold schema definitions.
 // http://json-schema.org/latest/json-schema-validation.html#rfc.section.5.26
-// RFC draft-wright-json-schema-validation-00, section 5.26
+// RFC draft-wright-json-schema-validation-00, section 5.26.
 type Definitions map[string]*Schema

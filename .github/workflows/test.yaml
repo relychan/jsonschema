@@ -1,34 +1,58 @@
-name: Test Go
+name: Lint and Test Go
 on:
+  pull_request:
   push:
-    tags:
-      - v*
     branches:
       - main
-  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   test:
-    name: Test
+    name: golangci-lint
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
           go-version-file: "go.mod"
 
-      - name: Install Dependencies
-        env:
-          GOPROXY: https://proxy.golang.org,direct
-        run: go mod download
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
 
       - name: Test
-        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -race -coverprofile=coverage.out ./...
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+      - name: Go coverage format
+        if: ${{ github.event_name == 'pull_request' && github.repository == 'relychan/jsonschema' }}
+        run: |
+          go get github.com/boumenot/gocover-cobertura
+          go install github.com/boumenot/gocover-cobertura
+          gocover-cobertura < coverage.out > coverage.xml
+      - name: Code Coverage Summary Report
+        if: ${{ github.event_name == 'pull_request' && github.repository == 'relychan/jsonschema' }}
+        uses: irongut/CodeCoverageSummary@v1.3.0
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          filename: coverage.xml
+          badge: true
+          fail_below_min: true
+          format: markdown
+          hide_branch_rate: false
+          hide_complexity: true
+          indicators: true
+          output: both
+          thresholds: "50 80"
+      - name: Add Coverage PR Comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        with:
+          path: code-coverage-results.md
+      - name: Dump docker logs on failure
+        if: failure()
+        uses: jwalton/gh-docker-logs@v2
