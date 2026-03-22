@@ -36,7 +36,7 @@ func (id ID) Validate() error {
 	}
 
 	if u.Scheme != "https" && u.Scheme != "http" {
-		return errors.New("unexpected schema")
+		return ErrIDInvalidHTTPScheme
 	}
 
 	return nil

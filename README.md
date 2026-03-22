@@ -4,7 +4,6 @@
 [![Test Go](https://github.com/relychan/jsonschema/actions/workflows/test.yaml/badge.svg)](https://github.com/relychan/jsonschema/actions/workflows/test.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/relychan/jsonschema)](https://goreportcard.com/report/github.com/relychan/jsonschema)
 [![GoDoc](https://godoc.org/github.com/relychan/jsonschema?status.svg)](https://godoc.org/github.com/relychan/jsonschema)
-[![codecov](https://codecov.io/gh/relychan/jsonschema/graph/badge.svg?token=JMEB8W8GNZ)](https://codecov.io/gh/relychan/jsonschema)
 ![Latest Tag](https://img.shields.io/github/v/tag/relychan/jsonschema)
 
 This package can be used to generate [JSON Schemas](http://json-schema.org/latest/json-schema-validation.html) from Go types through reflection.
