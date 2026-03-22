@@ -1,10 +1,6 @@
 name: Lint
 on:
   push:
-    tags:
-      - v*
-    branches:
-      - main
   pull_request:
 jobs:
   lint:
@@ -13,14 +9,12 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: "go.mod"
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.62
+        uses: golangci/golangci-lint-action@v8
