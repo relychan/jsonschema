@@ -1,14 +1,16 @@
-name: Test Go
+name: Lint and Test Go
 on:
-  push:
   pull_request:
+  push:
+    branches:
+      - main
 
 permissions:
   pull-requests: write
 
 jobs:
   test:
-    name: Test
+    name: golangci-lint
     runs-on: ubuntu-latest
 
     steps:
@@ -19,6 +21,9 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: "go.mod"
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
 
       - name: Test
         run: go test -race -coverprofile=coverage.out ./...
