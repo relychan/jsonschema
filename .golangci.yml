@@ -12,6 +12,19 @@ linters:
     - ireturn
     - tagalign
     - tagliatelle
+    - err113
+    - exhaustive
+    - forcetypeassert
+    - funlen
+    - gocognit
+    - goconst
+    - godox
+    - inamedparam
+    - nestif
+    - intrange
+    - noinlineerr
+    - staticcheck
+    - cyclop
   settings:
     depguard:
       rules:
@@ -137,27 +150,3 @@ formatters:
     # Which file paths to exclude.
     # Default: []
     paths: []
-
-# issues:
-#   max-per-linter: 0
-#   max-same: 0
-#   exclude-dirs:
-#     - resources
-#     - old
-#   exclude-files:
-#     - cmd/protopkg/main.go
-#   exclude-use-default: false
-#   exclude:
-#     # Captured by errcheck.
-#     - "^(G104|G204):"
-#     # Very commonly not checked.
-#     - 'Error return value of .(.*\.Help|.*\.MarkFlagRequired|(os\.)?std(out|err)\..*|.*Close|.*Flush|os\.Remove(All)?|.*Print(f|ln|)|os\.(Un)?Setenv). is not checked'
-#     # Weird error only seen on Kochiku...
-#     - "internal error: no range for"
-#     - 'exported method `.*\.(MarshalJSON|UnmarshalJSON|URN|Payload|GoString|Close|Provides|Requires|ExcludeFromHash|MarshalText|UnmarshalText|Description|Check|Poll|Severity)` should have comment or be unexported'
-#     - "composite literal uses unkeyed fields"
-#     - 'declaration of "err" shadows declaration'
-#     - "by other packages, and that stutters"
-#     - "Potential file inclusion via variable"
-#     - "at least one file in a package should have a package comment"
-#     - "bad syntax for struct tag pair"

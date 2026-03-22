@@ -18,6 +18,7 @@ var (
 func ToSnakeCase(str string) string {
 	snake := matchFirstCap.ReplaceAllString(str, "${1}-${2}")
 	snake = matchAllCap.ReplaceAllString(snake, "${1}-${2}")
+
 	return strings.ToLower(snake)
 }
 

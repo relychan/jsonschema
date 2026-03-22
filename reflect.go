@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/url"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -25,7 +26,7 @@ type customSchemaImpl interface {
 }
 
 // Function to be run after the schema has been generated.
-// this will let you modify a schema afterwards
+// this will let you modify a schema afterwards.
 type extendSchemaImpl interface {
 	JSONSchemaExtend(*Schema)
 }
@@ -43,29 +44,34 @@ type propertyAliasSchemaImpl interface {
 	JSONSchemaProperty(prop string) any
 }
 
-var customAliasSchema = reflect.TypeOf((*aliasSchemaImpl)(nil)).Elem()
-var customPropertyAliasSchema = reflect.TypeOf((*propertyAliasSchemaImpl)(nil)).Elem()
+var (
+	customAliasSchema         = reflect.TypeFor[aliasSchemaImpl]()
+	customPropertyAliasSchema = reflect.TypeFor[propertyAliasSchemaImpl]()
+)
 
-var customType = reflect.TypeOf((*customSchemaImpl)(nil)).Elem()
-var extendType = reflect.TypeOf((*extendSchemaImpl)(nil)).Elem()
+var (
+	customType = reflect.TypeFor[customSchemaImpl]()
+	extendType = reflect.TypeFor[extendSchemaImpl]()
+)
 
-// customSchemaGetFieldDocString
+// customSchemaGetFieldDocString.
 type customSchemaGetFieldDocString interface {
 	GetFieldDocString(fieldName string) string
 }
 
 type customGetFieldDocString func(fieldName string) string
 
-var customStructGetFieldDocString = reflect.TypeOf((*customSchemaGetFieldDocString)(nil)).Elem()
+var customStructGetFieldDocString = reflect.TypeFor[customSchemaGetFieldDocString]()
 
-// Reflect reflects to Schema from a value using the default Reflector
+// Reflect reflects to Schema from a value using the default Reflector.
 func Reflect(v any) *Schema {
 	return ReflectFromType(reflect.TypeOf(v))
 }
 
-// ReflectFromType generates root schema using the default Reflector
+// ReflectFromType generates root schema using the default Reflector.
 func ReflectFromType(t reflect.Type) *Schema {
 	r := &Reflector{}
+
 	return r.ReflectFromType(t)
 }
 
@@ -175,7 +181,7 @@ func (r *Reflector) Reflect(v any) *Schema {
 	return r.ReflectFromType(reflect.TypeOf(v))
 }
 
-// ReflectFromType generates root schema
+// ReflectFromType generates root schema.
 func (r *Reflector) ReflectFromType(t reflect.Type) *Schema {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem() // re-assign from pointer
@@ -186,6 +192,7 @@ func (r *Reflector) ReflectFromType(t reflect.Type) *Schema {
 	s := new(Schema)
 	definitions := Definitions{}
 	s.Definitions = definitions
+
 	bs := r.reflectTypeToSchemaWithID(definitions, t)
 	if r.ExpandedStruct {
 		*s = *definitions[name]
@@ -199,11 +206,14 @@ func (r *Reflector) ReflectFromType(t reflect.Type) *Schema {
 		baseSchemaID := r.BaseSchemaID
 		if baseSchemaID == EmptyID {
 			id := ID("https://" + t.PkgPath())
-			if err := id.Validate(); err == nil {
+
+			err := id.Validate()
+			if err == nil {
 				// it's okay to silently ignore URL errors
 				baseSchemaID = id
 			}
 		}
+
 		if baseSchemaID != EmptyID {
 			s.ID = baseSchemaID.Add(ToSnakeCase(name))
 		}
@@ -218,25 +228,25 @@ func (r *Reflector) ReflectFromType(t reflect.Type) *Schema {
 }
 
 // Available Go defined types for JSON Schema Validation.
-// RFC draft-wright-json-schema-validation-00, section 7.3
+// RFC draft-wright-json-schema-validation-00, section 7.3.
 var (
-	timeType = reflect.TypeOf(time.Time{}) // date-time RFC section 7.3.1
-	ipType   = reflect.TypeOf(net.IP{})    // ipv4 and ipv6 RFC section 7.3.4, 7.3.5
-	uriType  = reflect.TypeOf(url.URL{})   // uri RFC section 7.3.6
+	timeType = reflect.TypeFor[time.Time]() // date-time RFC section 7.3.1
+	ipType   = reflect.TypeFor[net.IP]()    // ipv4 and ipv6 RFC section 7.3.4, 7.3.5
+	uriType  = reflect.TypeFor[url.URL]()   // uri RFC section 7.3.6
 )
 
-// Byte slices will be encoded as base64
-var byteSliceType = reflect.TypeOf([]byte(nil))
+// Byte slices will be encoded as base64.
+var byteSliceType = reflect.TypeFor[[]byte]()
 
-// Except for json.RawMessage
-var rawMessageType = reflect.TypeOf(json.RawMessage{})
+// Except for json.RawMessage.
+var rawMessageType = reflect.TypeFor[json.RawMessage]()
 
 // Go code generated from protobuf enum types should fulfil this interface.
 type protoEnum interface {
 	EnumDescriptor() ([]byte, []int)
 }
 
-var protoEnumType = reflect.TypeOf((*protoEnum)(nil)).Elem()
+var protoEnumType = reflect.TypeFor[protoEnum]()
 
 // SetBaseSchemaID is a helper use to be able to set the reflectors base
 // schema ID from a string as opposed to then ID instance.
@@ -270,6 +280,7 @@ func (r *Reflector) reflectTypeToSchemaWithID(defs Definitions, t reflect.Type) 
 			}
 		}
 	}
+
 	return s
 }
 
@@ -285,6 +296,7 @@ func (r *Reflector) reflectTypeToSchema(definitions Definitions, t reflect.Type)
 		v := reflect.New(t)
 		o := v.Interface().(aliasSchemaImpl)
 		t = reflect.TypeOf(o.JSONSchemaAlias())
+
 		return r.refOrReflectTypeToSchema(definitions, t)
 	}
 
@@ -294,6 +306,7 @@ func (r *Reflector) reflectTypeToSchema(definitions Definitions, t reflect.Type)
 			return t
 		}
 	}
+
 	if rt := r.reflectCustomSchema(definitions, t); rt != nil {
 		return rt
 	}
@@ -308,6 +321,7 @@ func (r *Reflector) reflectTypeToSchema(definitions Definitions, t reflect.Type)
 			{Type: "string"},
 			{Type: "integer"},
 		}
+
 		return st
 	}
 
@@ -318,6 +332,7 @@ func (r *Reflector) reflectTypeToSchema(definitions Definitions, t reflect.Type)
 		// TODO differentiate ipv4 and ipv6 RFC section 7.3.4, 7.3.5
 		st.Type = "string"
 		st.Format = "ipv4"
+
 		return st
 	}
 
@@ -371,20 +386,27 @@ func (r *Reflector) reflectCustomSchema(definitions Definitions, t reflect.Type)
 		o := v.Interface().(customSchemaImpl)
 		st := o.JSONSchema()
 		r.addDefinition(definitions, t, st)
+
 		if ref := r.refDefinition(definitions, t); ref != nil {
 			return ref
 		}
+
 		return st
 	}
 
 	return nil
 }
 
-func (r *Reflector) reflectSchemaExtend(definitions Definitions, t reflect.Type, s *Schema) *Schema {
+func (r *Reflector) reflectSchemaExtend(
+	definitions Definitions,
+	t reflect.Type,
+	s *Schema,
+) *Schema {
 	if t.Implements(extendType) {
 		v := reflect.New(t)
 		o := v.Interface().(extendSchemaImpl)
 		o.JSONSchemaExtend(s)
+
 		if ref := r.refDefinition(definitions, t); ref != nil {
 			return ref
 		}
@@ -409,6 +431,7 @@ func (r *Reflector) reflectSliceOrArray(definitions Definitions, t reflect.Type,
 		st.MinItems = &l
 		st.MaxItems = &l
 	}
+
 	if t.Kind() == reflect.Slice && t.Elem() == byteSliceType.Elem() {
 		st.Type = "string"
 		// NOTE: ContentMediaType is not set here
@@ -433,8 +456,10 @@ func (r *Reflector) reflectMap(definitions Definitions, t reflect.Type, st *Sche
 			"^[0-9]+$": r.refOrReflectTypeToSchema(definitions, t.Elem()),
 		}
 		st.AdditionalProperties = FalseSchema
+
 		return
 	}
+
 	if t.Elem().Kind() != reflect.Interface {
 		st.AdditionalProperties = r.refOrReflectTypeToSchema(definitions, t.Elem())
 	}
@@ -447,31 +472,38 @@ func (r *Reflector) reflectStruct(definitions Definitions, t reflect.Type, s *Sc
 	case timeType: // date-time RFC section 7.3.1
 		s.Type = "string"
 		s.Format = "date-time"
+
 		return
 	case uriType: // uri RFC section 7.3.6
 		s.Type = "string"
 		s.Format = "uri"
+
 		return
 	}
 
 	r.addDefinition(definitions, t, s)
 	s.Type = "object"
 	s.Properties = NewProperties()
+
 	s.Description = r.lookupComment(t, "")
 	if r.AssignAnchor {
 		s.Anchor = t.Name()
 	}
+
 	if !r.AllowAdditionalProperties && s.AdditionalProperties == nil {
 		s.AdditionalProperties = FalseSchema
 	}
 
 	ignored := false
+
 	for _, it := range r.IgnoredTypes {
 		if reflect.TypeOf(it) == t {
 			ignored = true
+
 			break
 		}
 	}
+
 	if !ignored {
 		r.reflectStructFields(s, definitions, t)
 	}
@@ -481,11 +513,13 @@ func (r *Reflector) reflectStructFields(st *Schema, definitions Definitions, t r
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
+
 	if t.Kind() != reflect.Struct {
 		return
 	}
 
 	var getFieldDocString customGetFieldDocString
+
 	if t.Implements(customStructGetFieldDocString) {
 		v := reflect.New(t)
 		o := v.Interface().(customSchemaGetFieldDocString)
@@ -495,6 +529,7 @@ func (r *Reflector) reflectStructFields(st *Schema, definitions Definitions, t r
 	customPropertyMethod := func(string) any {
 		return nil
 	}
+
 	if t.Implements(customPropertyAliasSchema) {
 		v := reflect.New(t)
 		o := v.Interface().(propertyAliasSchemaImpl)
@@ -509,6 +544,7 @@ func (r *Reflector) reflectStructFields(st *Schema, definitions Definitions, t r
 			if shouldEmbed {
 				r.reflectStructFields(st, definitions, f.Type)
 			}
+
 			return
 		}
 
@@ -522,9 +558,11 @@ func (r *Reflector) reflectStructFields(st *Schema, definitions Definitions, t r
 		}
 
 		property.structKeywordsFromTags(f, st, name)
+
 		if property.Description == "" {
 			property.Description = r.lookupComment(t, f.Name)
 		}
+
 		if getFieldDocString != nil {
 			property.Description = getFieldDocString(f.Name)
 		}
@@ -541,6 +579,7 @@ func (r *Reflector) reflectStructFields(st *Schema, definitions Definitions, t r
 		}
 
 		st.Properties.Set(name, property)
+
 		if required {
 			st.Required = appendUniqueString(st.Required, name)
 		}
@@ -550,6 +589,7 @@ func (r *Reflector) reflectStructFields(st *Schema, definitions Definitions, t r
 		f := t.Field(i)
 		handleField(f)
 	}
+
 	if r.AdditionalFields != nil {
 		if af := r.AdditionalFields(t); af != nil {
 			for _, sf := range af {
@@ -560,11 +600,10 @@ func (r *Reflector) reflectStructFields(st *Schema, definitions Definitions, t r
 }
 
 func appendUniqueString(base []string, value string) []string {
-	for _, v := range base {
-		if v == value {
-			return base
-		}
+	if slices.Contains(base, value) {
+		return base
 	}
+
 	return append(base, value)
 }
 
@@ -574,6 +613,7 @@ func (r *Reflector) addDefinition(definitions Definitions, t reflect.Type, s *Sc
 	if name == "" {
 		return
 	}
+
 	definitions[name] = s
 }
 
@@ -582,13 +622,16 @@ func (r *Reflector) refDefinition(definitions Definitions, t reflect.Type) *Sche
 	if r.DoNotReference {
 		return nil
 	}
+
 	name := r.typeName(t)
 	if name == "" {
 		return nil
 	}
+
 	if _, ok := definitions[name]; !ok {
 		return nil
 	}
+
 	return &Schema{
 		Ref: "#/$defs/" + name,
 	}
@@ -599,13 +642,18 @@ func (r *Reflector) lookupID(t reflect.Type) ID {
 		if t.Kind() == reflect.Ptr {
 			t = t.Elem()
 		}
-		return r.Lookup(t)
 
+		return r.Lookup(t)
 	}
+
 	return EmptyID
 }
 
-func (t *Schema) structKeywordsFromTags(f reflect.StructField, parent *Schema, propertyName string) {
+func (t *Schema) structKeywordsFromTags(
+	f reflect.StructField,
+	parent *Schema,
+	propertyName string,
+) {
 	t.Description = f.Tag.Get("jsonschema_description")
 
 	tags := splitOnUnescapedCommas(f.Tag.Get("jsonschema"))
@@ -623,12 +671,13 @@ func (t *Schema) structKeywordsFromTags(f reflect.StructField, parent *Schema, p
 	case "boolean":
 		t.booleanKeywords(tags)
 	}
+
 	extras := strings.Split(f.Tag.Get("jsonschema_extras"), ",")
 	t.extraKeywords(extras)
 }
 
-// read struct tags for generic keywords
-func (t *Schema) genericKeywords(tags []string, parent *Schema, propertyName string) []string { //nolint:gocyclo
+// read struct tags for generic keywords.
+func (t *Schema) genericKeywords(tags []string, parent *Schema, propertyName string) []string {
 	unprocessed := make([]string, 0, len(tags))
 	for _, tag := range tags {
 		nameValue := strings.SplitN(tag, "=", 2)
@@ -645,11 +694,13 @@ func (t *Schema) genericKeywords(tags []string, parent *Schema, propertyName str
 				t.Anchor = val
 			case "oneof_required":
 				var typeFound *Schema
+
 				for i := range parent.OneOf {
 					if parent.OneOf[i].Title == nameValue[1] {
 						typeFound = parent.OneOf[i]
 					}
 				}
+
 				if typeFound == nil {
 					typeFound = &Schema{
 						Title:    nameValue[1],
@@ -657,14 +708,17 @@ func (t *Schema) genericKeywords(tags []string, parent *Schema, propertyName str
 					}
 					parent.OneOf = append(parent.OneOf, typeFound)
 				}
+
 				typeFound.Required = append(typeFound.Required, propertyName)
 			case "anyof_required":
 				var typeFound *Schema
+
 				for i := range parent.AnyOf {
 					if parent.AnyOf[i].Title == nameValue[1] {
 						typeFound = parent.AnyOf[i]
 					}
 				}
+
 				if typeFound == nil {
 					typeFound = &Schema{
 						Title:    nameValue[1],
@@ -672,16 +726,20 @@ func (t *Schema) genericKeywords(tags []string, parent *Schema, propertyName str
 					}
 					parent.AnyOf = append(parent.AnyOf, typeFound)
 				}
+
 				typeFound.Required = append(typeFound.Required, propertyName)
 			case "oneof_ref":
 				subSchema := t
 				if t.Items != nil {
 					subSchema = t.Items
 				}
+
 				if subSchema.OneOf == nil {
 					subSchema.OneOf = make([]*Schema, 0, 1)
 				}
+
 				subSchema.Ref = ""
+
 				refs := strings.Split(nameValue[1], ";")
 				for _, r := range refs {
 					subSchema.OneOf = append(subSchema.OneOf, &Schema{
@@ -692,7 +750,9 @@ func (t *Schema) genericKeywords(tags []string, parent *Schema, propertyName str
 				if t.OneOf == nil {
 					t.OneOf = make([]*Schema, 0, 1)
 				}
+
 				t.Type = ""
+
 				types := strings.Split(nameValue[1], ";")
 				for _, ty := range types {
 					t.OneOf = append(t.OneOf, &Schema{
@@ -704,10 +764,13 @@ func (t *Schema) genericKeywords(tags []string, parent *Schema, propertyName str
 				if t.Items != nil {
 					subSchema = t.Items
 				}
+
 				if subSchema.AnyOf == nil {
 					subSchema.AnyOf = make([]*Schema, 0, 1)
 				}
+
 				subSchema.Ref = ""
+
 				refs := strings.Split(nameValue[1], ";")
 				for _, r := range refs {
 					subSchema.AnyOf = append(subSchema.AnyOf, &Schema{
@@ -718,7 +781,9 @@ func (t *Schema) genericKeywords(tags []string, parent *Schema, propertyName str
 				if t.AnyOf == nil {
 					t.AnyOf = make([]*Schema, 0, 1)
 				}
+
 				t.Type = ""
+
 				types := strings.Split(nameValue[1], ";")
 				for _, ty := range types {
 					t.AnyOf = append(t.AnyOf, &Schema{
@@ -730,28 +795,31 @@ func (t *Schema) genericKeywords(tags []string, parent *Schema, propertyName str
 			}
 		}
 	}
+
 	return unprocessed
 }
 
-// read struct tags for boolean type keywords
+// read struct tags for boolean type keywords.
 func (t *Schema) booleanKeywords(tags []string) {
 	for _, tag := range tags {
 		nameValue := strings.Split(tag, "=")
 		if len(nameValue) != 2 {
 			continue
 		}
+
 		name, val := nameValue[0], nameValue[1]
 		if name == "default" {
-			if val == "true" {
+			switch val {
+			case "true":
 				t.Default = true
-			} else if val == "false" {
+			case "false":
 				t.Default = false
 			}
 		}
 	}
 }
 
-// read struct tags for string type keywords
+// read struct tags for string type keywords.
 func (t *Schema) stringKeywords(tags []string) {
 	for _, tag := range tags {
 		nameValue := strings.SplitN(tag, "=", 2)
@@ -783,7 +851,7 @@ func (t *Schema) stringKeywords(tags []string) {
 	}
 }
 
-// read struct tags for numerical type keywords
+// read struct tags for numerical type keywords.
 func (t *Schema) numericalKeywords(tags []string) {
 	for _, tag := range tags {
 		nameValue := strings.Split(tag, "=")
@@ -833,7 +901,7 @@ func (t *Schema) numericalKeywords(tags []string) {
 //     }
 // }
 
-// read struct tags for array type keywords
+// read struct tags for array type keywords.
 func (t *Schema) arrayKeywords(tags []string) {
 	var defaultValues []any
 
@@ -856,10 +924,14 @@ func (t *Schema) arrayKeywords(tags []string) {
 			case "pattern":
 				t.Items.Pattern = val
 			default:
-				unprocessed = append(unprocessed, tag) // left for further processing by underlying type
+				unprocessed = append(
+					unprocessed,
+					tag,
+				) // left for further processing by underlying type
 			}
 		}
 	}
+
 	if len(defaultValues) > 0 {
 		t.Default = defaultValues
 	}
@@ -896,6 +968,7 @@ func (t *Schema) setExtra(key, val string) {
 	if t.Extras == nil {
 		t.Extras = map[string]any{}
 	}
+
 	if existingVal, ok := t.Extras[key]; ok {
 		switch existingVal := existingVal.(type) {
 		case string:
@@ -913,13 +986,16 @@ func (t *Schema) setExtra(key, val string) {
 			t.Extras[key], _ = strconv.Atoi(val)
 		default:
 			var x any
-			if val == "true" {
+
+			switch val {
+			case "true":
 				x = true
-			} else if val == "false" {
+			case "false":
 				x = false
-			} else {
+			default:
 				x = val
 			}
+
 			t.Extras[key] = x
 		}
 	}
@@ -930,12 +1006,12 @@ func requiredFromJSONTags(tags []string, val *bool) {
 		return
 	}
 
-	for _, tag := range tags[1:] {
-		if tag == "omitempty" {
-			*val = false
-			return
-		}
+	if slices.Contains(tags[1:], "omitempty") {
+		*val = false
+
+		return
 	}
+
 	*val = true
 }
 
@@ -943,6 +1019,7 @@ func requiredFromJSONSchemaTags(tags []string, val *bool) {
 	if ignoredByJSONSchemaTags(tags) {
 		return
 	}
+
 	for _, tag := range tags {
 		if tag == "required" {
 			*val = true
@@ -954,12 +1031,8 @@ func nullableFromJSONSchemaTags(tags []string) bool {
 	if ignoredByJSONSchemaTags(tags) {
 		return false
 	}
-	for _, tag := range tags {
-		if tag == "nullable" {
-			return true
-		}
-	}
-	return false
+
+	return slices.Contains(tags, "nullable")
 }
 
 func ignoredByJSONTags(tags []string) bool {
@@ -971,12 +1044,7 @@ func ignoredByJSONSchemaTags(tags []string) bool {
 }
 
 func inlinedByJSONTags(tags []string) bool {
-	for _, tag := range tags[1:] {
-		if tag == "inline" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(tags[1:], "inline")
 }
 
 // toJSONNumber converts string to *json.Number.
@@ -986,9 +1054,11 @@ func toJSONNumber(s string) (json.Number, bool) {
 	if _, err := num.Int64(); err == nil {
 		return num, true
 	}
+
 	if _, err := num.Float64(); err == nil {
 		return num, true
 	}
+
 	return json.Number(""), false
 }
 
@@ -997,6 +1067,7 @@ func parseUint(num string) *uint64 {
 	if err != nil {
 		return nil
 	}
+
 	return &val
 }
 
@@ -1004,6 +1075,7 @@ func (r *Reflector) fieldNameTag() string {
 	if r.FieldNameTag != "" {
 		return r.FieldNameTag
 	}
+
 	return "json"
 }
 
@@ -1024,6 +1096,7 @@ func (r *Reflector) reflectFieldName(f reflect.StructField) (string, bool, bool,
 	if !r.RequiredFromJSONSchemaTags {
 		requiredFromJSONTags(jsonTags, &required)
 	}
+
 	requiredFromJSONSchemaTags(schemaTags, &required)
 
 	nullable := nullableFromJSONSchemaTags(schemaTags)
@@ -1050,6 +1123,7 @@ func (r *Reflector) reflectFieldName(f reflect.StructField) (string, bool, bool,
 	if jsonTags[0] != "" {
 		name = jsonTags[0]
 	}
+
 	if !f.Anonymous && f.PkgPath != "" {
 		// field not anonymous and not export has no export name
 		name = ""
@@ -1064,17 +1138,22 @@ func (r *Reflector) reflectFieldName(f reflect.StructField) (string, bool, bool,
 func (t *Schema) UnmarshalJSON(data []byte) error {
 	if bytes.Equal(data, []byte("true")) {
 		*t = *TrueSchema
+
 		return nil
 	} else if bytes.Equal(data, []byte("false")) {
 		*t = *FalseSchema
+
 		return nil
 	}
+
 	type SchemaAlt Schema
+
 	aux := &struct {
 		*SchemaAlt
 	}{
 		SchemaAlt: (*SchemaAlt)(t),
 	}
+
 	return json.Unmarshal(data, aux)
 }
 
@@ -1084,28 +1163,37 @@ func (t *Schema) MarshalJSON() ([]byte, error) {
 		if *t.boolean {
 			return []byte("true"), nil
 		}
+
 		return []byte("false"), nil
 	}
+
 	if reflect.DeepEqual(&Schema{}, t) {
 		// Don't bother returning empty schemas
 		return []byte("true"), nil
 	}
+
 	type SchemaAlt Schema
+
 	b, err := json.Marshal((*SchemaAlt)(t))
 	if err != nil {
 		return nil, err
 	}
+
 	if len(t.Extras) == 0 {
 		return b, nil
 	}
+
 	m, err := json.Marshal(t.Extras)
 	if err != nil {
 		return nil, err
 	}
+
 	if len(b) == 2 {
 		return m, nil
 	}
+
 	b[len(b)-1] = ','
+
 	return append(b, m[1:]...), nil
 }
 
@@ -1115,20 +1203,23 @@ func (r *Reflector) typeName(t reflect.Type) string {
 			return name
 		}
 	}
+
 	return t.Name()
 }
 
 // Split on commas that are not preceded by `\`.
-// This way, we prevent splitting regexes
+// This way, we prevent splitting regexes.
 func splitOnUnescapedCommas(tagString string) []string {
 	ret := make([]string, 0)
 	separated := strings.Split(tagString, ",")
 	ret = append(ret, separated[0])
+
 	i := 0
 	for _, nextTag := range separated[1:] {
 		if len(ret[i]) == 0 {
 			ret = append(ret, nextTag)
 			i++
+
 			continue
 		}
 

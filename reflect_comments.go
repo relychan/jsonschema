@@ -2,16 +2,15 @@ package jsonschema
 
 import (
 	"fmt"
+	"go/ast"
+	"go/doc"
+	"go/parser"
+	"go/token"
 	"io/fs"
 	gopath "path"
 	"path/filepath"
 	"reflect"
 	"strings"
-
-	"go/ast"
-	"go/doc"
-	"go/parser"
-	"go/token"
 )
 
 type commentOptions struct {
@@ -48,6 +47,7 @@ func (r *Reflector) AddGoComments(base, path string, opts ...CommentOption) erro
 	if r.CommentMap == nil {
 		r.CommentMap = make(map[string]string)
 	}
+
 	co := new(commentOptions)
 	for _, opt := range opts {
 		opt(co)
@@ -56,24 +56,32 @@ func (r *Reflector) AddGoComments(base, path string, opts ...CommentOption) erro
 	return r.extractGoComments(base, path, r.CommentMap, co)
 }
 
-func (r *Reflector) extractGoComments(base, path string, commentMap map[string]string, opts *commentOptions) error {
+func (r *Reflector) extractGoComments(
+	base, path string,
+	commentMap map[string]string,
+	opts *commentOptions,
+) error {
 	fset := token.NewFileSet()
 	dict := make(map[string][]*ast.Package)
+
 	err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
+
 		if info.IsDir() {
 			d, err := parser.ParseDir(fset, path, nil, parser.ParseComments)
 			if err != nil {
 				return err
 			}
+
 			for _, v := range d {
 				// paths may have multiple packages, like for tests
 				k := gopath.Join(base, path)
 				dict[k] = append(dict[k], v)
 			}
 		}
+
 		return nil
 	})
 	if err != nil {
@@ -84,6 +92,7 @@ func (r *Reflector) extractGoComments(base, path string, commentMap map[string]s
 		for _, f := range p {
 			gtxt := ""
 			typ := ""
+
 			ast.Inspect(f, func(n ast.Node) bool {
 				switch x := n.(type) {
 				case *ast.TypeSpec:
@@ -96,9 +105,11 @@ func (r *Reflector) extractGoComments(base, path string, commentMap map[string]s
 							txt = gtxt
 							gtxt = ""
 						}
+
 						if !opts.fullObjectText {
 							txt = doc.Synopsis(txt)
 						}
+
 						commentMap[fmt.Sprintf("%s.%s", pkg, typ)] = strings.TrimSpace(txt)
 					}
 				case *ast.Field:
@@ -106,6 +117,7 @@ func (r *Reflector) extractGoComments(base, path string, commentMap map[string]s
 					if txt == "" {
 						txt = x.Comment.Text()
 					}
+
 					if typ != "" && txt != "" {
 						for _, n := range x.Names {
 							if ast.IsExported(n.String()) {
@@ -118,6 +130,7 @@ func (r *Reflector) extractGoComments(base, path string, commentMap map[string]s
 					// remember for the next type
 					gtxt = x.Doc.Text()
 				}
+
 				return true
 			})
 		}
